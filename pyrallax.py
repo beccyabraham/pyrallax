@@ -1,11 +1,22 @@
 import os
 import numpy as np
 import argparse
+import re
 
 from PIL import Image
 
 def get_image_layers(img_dir):
-    return [np.asarray(Image.open(os.path.join(img_dir, f))) for f in sorted(os.listdir(img_dir))]
+    img_nums = {}
+    files = os.listdir(img_dir)
+    for f in files:
+        if f.startswith('.'):
+            continue
+        num = re.findall(r'\d+', f)
+        if len(num) != 1:
+            raise Exception("Multiple/no numbers in filename")
+        img_nums[f] = int(num[0])
+    files = filter(img_nums.get, files)
+    return [np.asarray(Image.open(os.path.join(img_dir, f))) for f in sorted(files, key=img_nums.get)]
 
 def get_scales(n):
     row_scales = [.1 for x in range(n)]
