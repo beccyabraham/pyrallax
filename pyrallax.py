@@ -5,6 +5,7 @@ import re
 
 from PIL import Image
 
+
 def get_image_layers(img_dir):
     img_nums = {}
     files = os.listdir(img_dir)
@@ -18,6 +19,7 @@ def get_image_layers(img_dir):
     files = filter(img_nums.get, files)
     return [np.asarray(Image.open(os.path.join(img_dir, f))) for f in sorted(files, key=img_nums.get)]
 
+
 def dim_scales(n, scales):
     if scales:
         if len(scales) == 1:
@@ -30,10 +32,12 @@ def dim_scales(n, scales):
             raise Exception("Expected {} scale values, got {}".format(n, len(scales)))
     return [0 for _ in range(n)]
 
+
 def get_scales(n, x_scales, y_scales):
     col_scales = dim_scales(n, x_scales)
     row_scales = dim_scales(n, y_scales)
     return row_scales, col_scales
+
 
 def get_paths(window_size, img_size, row_scales, col_scales, num_points):
     paths = []
@@ -64,6 +68,7 @@ def get_paths(window_size, img_size, row_scales, col_scales, num_points):
         paths.append(path)
     return paths
 
+
 def rotate_layer(layer, path):
     ret = []
     for tl_row, br_row, tl_col, br_col in path:
@@ -71,14 +76,17 @@ def rotate_layer(layer, path):
         ret.append(Image.fromarray(cropped_img))
     return ret
 
+
 def make_frame(layers):
     img = layers[0]
     for layer in layers[1:]:
         img.paste(layer, mask=layer)
     return img
 
+
 def giphity(out, frames):
     frames[0].save(out, save_all=True, append_images=frames[1:])
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='para some llax!')
@@ -94,7 +102,8 @@ if __name__ == '__main__':
     window_size = np.array(np.array(img_size) * .9, dtype=int)
 
     row_scales, col_scales = get_scales(len(layers), args.x_scales, args.y_scales)
-    paths = get_paths(window_size, img_size, row_scales, col_scales, args.num_points)   # assume all the layers are the same shape
+    # assume all the layers are the same shape
+    paths = get_paths(window_size, img_size, row_scales, col_scales, args.num_points)
     all_layers = [rotate_layer(layer, path) for layer, path in zip(layers, paths)]
     frames = [make_frame(frame_layers) for frame_layers in zip(*all_layers)]
     giphity(args.out_file, frames)
