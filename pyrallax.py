@@ -7,6 +7,11 @@ from PIL import Image
 
 
 def get_image_layers(img_dir):
+    """Read and validate image layers from file.
+
+    :param img_dir: Location of layer images. File names include layer numbers.
+    :return: A list of layers as arrays in sorted order
+    """
     img_nums = {}
     files = os.listdir(img_dir)
     for f in files:
@@ -17,26 +22,36 @@ def get_image_layers(img_dir):
             raise Exception("Multiple/no numbers in filename")
         img_nums[f] = int(num[0])
     files = filter(img_nums.get, files)
-    return [np.asarray(Image.open(os.path.join(img_dir, f))) for f in sorted(files, key=img_nums.get)]
+    layers = [np.asarray(Image.open(os.path.join(img_dir, f)))
+              for f in sorted(files, key=img_nums.get)]
+    if len(set([layer.shape for layer in layers])) != 1:
+        raise Exception("Image size mismatch")
+    return layers
 
 
 def dim_scales(n, scales):
+    """Determine the "scale" or rate of movement along a dimension (x or y)
+    for each layer. `scales` is either empty, of length 1, or it specifies
+    all the layer scales. If scales is empty, use 0 for every layer.
+    If scales contains a single value, use that value for every layer.
+
+    :param n: The number of layers.
+    :param scales: A list of length 0, 1 or n, of floats in [0, 1].
+    :return: A list of length n of floats in [0, 1].
+    """
     if scales:
         if len(scales) == 1:
+            val = scales[0]
+            if val > 1 or val < 0:
+                raise Exception("Invalid value for scales")
             return [scales[0] for _ in range(n)]
         elif len(scales) == n:
             if any([val > 1 or val < 0 for val in scales]):
-                raise Exception("Invalid scales")
+                raise Exception("Invalid values for scales")
             return scales
         else:
             raise Exception("Expected {} scale values, got {}".format(n, len(scales)))
-    return [0 for _ in range(n)]
-
-
-def get_scales(n, x_scales, y_scales):
-    col_scales = dim_scales(n, x_scales)
-    row_scales = dim_scales(n, y_scales)
-    return row_scales, col_scales
+    return [0 for _ in range(n)]    # no movement along this dimension
 
 
 def get_paths(window_size, img_size, row_scales, col_scales, num_points):
@@ -88,6 +103,20 @@ def giphity(out, frames):
     frames[0].save(out, save_all=True, append_images=frames[1:])
 
 
+def main(args):
+    layers = get_image_layers(args.img_dir)
+    img_size = np.array(layers[0].shape)
+    window_size = np.array(np.array(img_size) * .9, dtype=int)
+
+    col_scales = dim_scales(len(layers), args.x_scales)
+    row_scales = dim_scales(len(layers), args.y_scales)
+
+    paths = get_paths(window_size, img_size, row_scales, col_scales, args.num_points)
+    all_layers = [rotate_layer(layer, path) for layer, path in zip(layers, paths)]
+    frames = [make_frame(frame_layers) for frame_layers in zip(*all_layers)]
+    giphity(args.out_file, frames)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='para some llax!')
     parser.add_argument('img_dir', type=str)
@@ -97,13 +126,5 @@ if __name__ == '__main__':
     parser.add_argument('--y_scales', nargs='*', type=float, required=False)
 
     args = parser.parse_args()
-    layers = get_image_layers(args.img_dir)
-    img_size = np.array(layers[0].shape)
-    window_size = np.array(np.array(img_size) * .9, dtype=int)
+    main(args)
 
-    row_scales, col_scales = get_scales(len(layers), args.x_scales, args.y_scales)
-    # assume all the layers are the same shape
-    paths = get_paths(window_size, img_size, row_scales, col_scales, args.num_points)
-    all_layers = [rotate_layer(layer, path) for layer, path in zip(layers, paths)]
-    frames = [make_frame(frame_layers) for frame_layers in zip(*all_layers)]
-    giphity(args.out_file, frames)
