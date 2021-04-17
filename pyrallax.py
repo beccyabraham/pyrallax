@@ -98,8 +98,3 @@ if __name__ == '__main__':
     all_layers = [rotate_layer(layer, path) for layer, path in zip(layers, paths)]
     frames = [make_frame(frame_layers) for frame_layers in zip(*all_layers)]
     giphity(args.out_file, frames)
-
-
-
-
-
