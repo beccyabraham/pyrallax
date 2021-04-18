@@ -54,28 +54,45 @@ def dim_scales(n, scales):
     return [0 for _ in range(n)]    # no movement along this dimension
 
 
-def get_paths(window_size, img_size, row_scales, col_scales, num_points):
+def get_paths(window_size, img_size, row_scales, col_scales, num_frames):
+    """Each frame of the gif is made up of windows into each original image layer.
+    The function calculates where the corners of these windows are, for each
+    layer of each frame.
+
+    :param window_size: A float in (0, 1] representing how large the windows should be,
+    relative to the image size
+    :param img_size: The shape of the layer images
+    :param row_scales: The rates of motion to use in the row dimension
+    :param col_scales: The rates of motion to use in the column dimension
+    :param num_frames: The number of frames for the resulting gif
+    :return: A list of paths, one for each layer, where a path is a length `num_frames`
+    that contains corner positions for windows into our layers
+    """
+    if window_size <= 0 or window_size > 1:
+        raise Exception("Invalid window size")
+    window_shape = np.array(np.array(img_size) * window_size, dtype=int)
     paths = []
+
+    num_img_rows, num_img_cols, _ = img_size
+    num_window_rows, num_window_cols, _ = window_shape
+
+    top_window_row = num_window_rows // 2
+    bottom_window_row = num_img_rows - (num_window_rows // 2)
+    row_amplitude = (bottom_window_row - top_window_row) // 2
+
+    left_window_col = num_window_cols // 2
+    right_window_col = num_img_cols - (num_window_cols // 2)
+    col_amplitude = (right_window_col - left_window_col) // 2
+
     for row_scale, col_scale in zip(row_scales, col_scales):
-        num_img_rows, num_img_cols, _ = img_size
-        num_window_rows, num_window_cols, _ = window_size
-
-        top_window_row = num_window_rows // 2
-        bottom_window_row = num_img_rows - (num_window_rows // 2)
-        row_amplitude = (bottom_window_row - top_window_row) // 2
         row_amplitude *= row_scale
-
-        left_window_col = num_window_cols // 2
-        right_window_col = num_img_cols - (num_window_cols // 2)
-        col_amplitude = (right_window_col - left_window_col) // 2
         col_amplitude *= col_scale
-
         amplitude = np.array([row_amplitude, col_amplitude])
 
         origin = img_size[:-1] // 2
         path = []
-        for t in range(num_points):
-            theta = t * (2 * np.pi / num_points)
+        for t in range(num_frames):
+            theta = t * (2 * np.pi / num_frames)
             window_cent = origin + (amplitude * np.array([np.cos(theta), np.sin(theta)]))
             tl_row, tl_col = window_cent - (np.array([num_window_rows, num_window_cols]) // 2)
             br_row, br_col = window_cent + (np.array([num_window_rows, num_window_cols]) // 2)
@@ -84,7 +101,10 @@ def get_paths(window_size, img_size, row_scales, col_scales, num_points):
     return paths
 
 
-def rotate_layer(layer, path):
+def crop_layer(layer, path):
+    """Crop an image layer for each set of corners in `path` to generate
+    the final gif frames for that layer.
+    """
     ret = []
     for tl_row, br_row, tl_col, br_col in path:
         cropped_img = layer[tl_row:br_row, tl_col:br_col, :]
@@ -93,28 +113,25 @@ def rotate_layer(layer, path):
 
 
 def make_frame(layers):
+    """Compose all the layers for a frame."""
     img = layers[0]
     for layer in layers[1:]:
         img.paste(layer, mask=layer)
     return img
 
 
-def giphity(out, frames):
-    frames[0].save(out, save_all=True, append_images=frames[1:])
-
-
 def main(args):
     layers = get_image_layers(args.img_dir)
     img_size = np.array(layers[0].shape)
-    window_size = np.array(np.array(img_size) * .9, dtype=int)
+    window_size = .9
 
     col_scales = dim_scales(len(layers), args.x_scales)
     row_scales = dim_scales(len(layers), args.y_scales)
 
     paths = get_paths(window_size, img_size, row_scales, col_scales, args.num_points)
-    all_layers = [rotate_layer(layer, path) for layer, path in zip(layers, paths)]
+    all_layers = [crop_layer(layer, path) for layer, path in zip(layers, paths)]
     frames = [make_frame(frame_layers) for frame_layers in zip(*all_layers)]
-    giphity(args.out_file, frames)
+    frames[0].save(args.out_file, save_all=True, append_images=frames[1:])
 
 
 if __name__ == '__main__':
