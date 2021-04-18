@@ -2,6 +2,7 @@ import os
 import numpy as np
 import argparse
 import re
+import imageio
 
 from PIL import Image
 
@@ -29,7 +30,7 @@ def get_image_layers(img_dir):
     return layers
 
 
-def dim_scales(n, scales, diff, start_scale, frames_to_freeze):
+def dim_scales(n, scales, diff, frames_to_freeze):
     """Determine the "scale" or rate of movement along a dimension (x or y)
     for each layer. `scales` is either empty, of length 1, or it specifies
     all the layer scales. If scales is empty, use 0 for every layer.
@@ -38,7 +39,6 @@ def dim_scales(n, scales, diff, start_scale, frames_to_freeze):
     :param n: The number of layers.
     :param scales: A list of length 0, 1 or n, of floats in [0, 1].
     :param diff:
-    :param start_scale:
     :param frames_to_freeze:
     :return: A list of length n of floats in [0, 1].
     """
@@ -55,18 +55,17 @@ def dim_scales(n, scales, diff, start_scale, frames_to_freeze):
         else:
             raise Exception("Expected {} scale values, got {}".format(n, len(scales)))
     elif diff:
-        if not start_scale or start_scale > 1:
-            raise Exception("Invalid/missing start scale")
-        scales = [start_scale]
-        curr_scale = start_scale
-        for i in range(1, n):
+        max_scale = 1
+        scales = []
+        for i in range(n):
             if frames_to_freeze and i in frames_to_freeze:
                 scales.append(0)
             else:
-                curr_scale += diff
-                if curr_scale > 1:
+                scale = max_scale - (diff * (n - i - 1))
+                if scale < 0:
                     raise Exception("Invalid diff")
-                scales.append(curr_scale)
+                scales.append(scale)
+        return scales
     return [0 for _ in range(n)]    # no movement along this dimension
 
 
@@ -94,15 +93,15 @@ def get_paths(window_size, img_size, row_scales, col_scales, num_frames):
 
     top_window_row = num_window_rows // 2
     bottom_window_row = num_img_rows - (num_window_rows // 2)
-    row_amplitude = (bottom_window_row - top_window_row) // 2
+    base_row_amplitude = (bottom_window_row - top_window_row) // 2
 
     left_window_col = num_window_cols // 2
     right_window_col = num_img_cols - (num_window_cols // 2)
-    col_amplitude = (right_window_col - left_window_col) // 2
+    base_col_amplitude = (right_window_col - left_window_col) // 2
 
     for row_scale, col_scale in zip(row_scales, col_scales):
-        row_amplitude *= row_scale
-        col_amplitude *= col_scale
+        row_amplitude = row_scale * base_row_amplitude
+        col_amplitude = col_scale * base_col_amplitude
         amplitude = np.array([row_amplitude, col_amplitude])
 
         origin = img_size[:-1] // 2
@@ -142,9 +141,9 @@ def main(args):
     window_size = args.window_size
 
     col_scales = dim_scales(len(layers), args.x_scales,
-                            args.x_diff, args.x_start_scale, args.x_freeze)
+                            args.x_diff, args.x_freeze)
     row_scales = dim_scales(len(layers), args.y_scales,
-                            args.y_diff, args.y_start_scale, args.y_freeze)
+                            args.y_diff, args.y_freeze)
 
     paths = get_paths(window_size, img_size, row_scales, col_scales, args.num_frames)
     all_layers = [crop_layer(layer, path) for layer, path in zip(layers, paths)]
@@ -162,11 +161,9 @@ if __name__ == '__main__':
     parser.add_argument('--x_scales', nargs='*', type=float, required=False)
     parser.add_argument('--y_scales', nargs='*', type=float, required=False)
 
-    parser.add_argument('--x_diff', nargs='*', type=float, required=False)
-    parser.add_argument('--x_start_scale', type=float, required=False)
+    parser.add_argument('--x_diff', type=float, default=.1, required=False)
     parser.add_argument('--x_freeze', nargs='*', type=int, required=False)
-    parser.add_argument('--y_diff', nargs='*', type=float, required=False)
-    parser.add_argument('--y_start_scale', type=float, required=False)
+    parser.add_argument('--y_diff', type=float, default=.1, required=False)
     parser.add_argument('--y_freeze', nargs='*', type=int, required=False)
 
     args = parser.parse_args()
