@@ -159,20 +159,20 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='para some llax!')
-    parser.add_argument('img_dir', type=str)
-    parser.add_argument('out_file', type=str)
-    parser.add_argument('num_frames', type=int)
+    parser = argparse.ArgumentParser(description='Create parallax animations from layered images.')
+    parser.add_argument('img_dir', type=str, help='Source location for image layers')
+    parser.add_argument('out_file', type=str, help='Output location')
+    parser.add_argument('num_frames', type=int, help='Number of frames to interpolate for one rotation of the animation')
     parser.add_argument('--format', type=str, default='gif', choices=['gif', 'mp4', 'png'])
-    parser.add_argument('--window_size', type=float, default=0.9)
+    parser.add_argument('--window_size', type=float, default=0.9, help='The amount of each layer that will be visible in a frame')
 
-    parser.add_argument('--x_scales', nargs='*', type=float, required=False)
-    parser.add_argument('--y_scales', nargs='*', type=float, required=False)
+    parser.add_argument('--x_scales', nargs='*', type=float, required=False, help='Optionally, specify the rate of movement in the x axis for each layer')
+    parser.add_argument('--y_scales', nargs='*', type=float, required=False, help='Optionally, specify the rate of movement in the y axis for each layer')
 
-    parser.add_argument('--x_diff', type=float, default=.1, required=False)
-    parser.add_argument('--x_freeze', nargs='*', type=int, required=False)
-    parser.add_argument('--y_diff', type=float, default=.1, required=False)
-    parser.add_argument('--y_freeze', nargs='*', type=int, required=False)
+    parser.add_argument('--x_diff', type=float, default=.1, required=False, help='Optionally, specify the difference in rates of movements per layer in the x axis')
+    parser.add_argument('--x_freeze', nargs='*', type=int, required=False, help='Frames that should move in the x axis (0-indexed)')
+    parser.add_argument('--y_diff', type=float, default=.1, required=False, help='Optionally, specify the difference in rates of movements per layer in the y axis')
+    parser.add_argument('--y_freeze', nargs='*', type=int, required=False, help='Frames that should move in the y axis (0-indexed)')
 
     args = parser.parse_args()
     main(args)
