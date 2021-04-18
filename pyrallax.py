@@ -123,12 +123,12 @@ def make_frame(layers):
 def main(args):
     layers = get_image_layers(args.img_dir)
     img_size = np.array(layers[0].shape)
-    window_size = .9
+    window_size = args.window_size
 
     col_scales = dim_scales(len(layers), args.x_scales)
     row_scales = dim_scales(len(layers), args.y_scales)
 
-    paths = get_paths(window_size, img_size, row_scales, col_scales, args.num_points)
+    paths = get_paths(window_size, img_size, row_scales, col_scales, args.num_frames)
     all_layers = [crop_layer(layer, path) for layer, path in zip(layers, paths)]
     frames = [make_frame(frame_layers) for frame_layers in zip(*all_layers)]
     frames[0].save(args.out_file, save_all=True, append_images=frames[1:])
@@ -138,7 +138,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='para some llax!')
     parser.add_argument('img_dir', type=str)
     parser.add_argument('out_file', type=str)
-    parser.add_argument('num_points', type=int)
+    parser.add_argument('num_frames', type=int)
+    parser.add_argument('--window_size', type=float, default=0.9)
     parser.add_argument('--x_scales', nargs='*', type=float, required=False)
     parser.add_argument('--y_scales', nargs='*', type=float, required=False)
 
