@@ -29,7 +29,7 @@ def get_image_layers(img_dir):
     return layers
 
 
-def dim_scales(n, scales):
+def dim_scales(n, scales, diff, start_scale, frames_to_freeze):
     """Determine the "scale" or rate of movement along a dimension (x or y)
     for each layer. `scales` is either empty, of length 1, or it specifies
     all the layer scales. If scales is empty, use 0 for every layer.
@@ -37,6 +37,9 @@ def dim_scales(n, scales):
 
     :param n: The number of layers.
     :param scales: A list of length 0, 1 or n, of floats in [0, 1].
+    :param diff:
+    :param start_scale:
+    :param frames_to_freeze:
     :return: A list of length n of floats in [0, 1].
     """
     if scales:
@@ -51,6 +54,19 @@ def dim_scales(n, scales):
             return scales
         else:
             raise Exception("Expected {} scale values, got {}".format(n, len(scales)))
+    elif diff:
+        if not start_scale or start_scale > 1:
+            raise Exception("Invalid/missing start scale")
+        scales = [start_scale]
+        curr_scale = start_scale
+        for i in range(1, n):
+            if frames_to_freeze and i in frames_to_freeze:
+                scales.append(0)
+            else:
+                curr_scale += diff
+                if curr_scale > 1:
+                    raise Exception("Invalid diff")
+                scales.append(curr_scale)
     return [0 for _ in range(n)]    # no movement along this dimension
 
 
@@ -125,8 +141,10 @@ def main(args):
     img_size = np.array(layers[0].shape)
     window_size = args.window_size
 
-    col_scales = dim_scales(len(layers), args.x_scales)
-    row_scales = dim_scales(len(layers), args.y_scales)
+    col_scales = dim_scales(len(layers), args.x_scales,
+                            args.x_diff, args.x_start_scale, args.x_freeze)
+    row_scales = dim_scales(len(layers), args.y_scales,
+                            args.y_diff, args.y_start_scale, args.y_freeze)
 
     paths = get_paths(window_size, img_size, row_scales, col_scales, args.num_frames)
     all_layers = [crop_layer(layer, path) for layer, path in zip(layers, paths)]
@@ -140,8 +158,16 @@ if __name__ == '__main__':
     parser.add_argument('out_file', type=str)
     parser.add_argument('num_frames', type=int)
     parser.add_argument('--window_size', type=float, default=0.9)
+
     parser.add_argument('--x_scales', nargs='*', type=float, required=False)
     parser.add_argument('--y_scales', nargs='*', type=float, required=False)
+
+    parser.add_argument('--x_diff', nargs='*', type=float, required=False)
+    parser.add_argument('--x_start_scale', type=float, required=False)
+    parser.add_argument('--x_freeze', nargs='*', type=int, required=False)
+    parser.add_argument('--y_diff', nargs='*', type=float, required=False)
+    parser.add_argument('--y_start_scale', type=float, required=False)
+    parser.add_argument('--y_freeze', nargs='*', type=int, required=False)
 
     args = parser.parse_args()
     main(args)
