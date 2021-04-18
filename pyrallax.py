@@ -148,7 +148,14 @@ def main(args):
     paths = get_paths(window_size, img_size, row_scales, col_scales, args.num_frames)
     all_layers = [crop_layer(layer, path) for layer, path in zip(layers, paths)]
     frames = [make_frame(frame_layers) for frame_layers in zip(*all_layers)]
-    frames[0].save(args.out_file, save_all=True, append_images=frames[1:])
+
+    if args.format == 'gif' or args.format == 'png':
+        frames[0].save(args.out_file, save_all=True, append_images=frames[1:])
+    elif args.format == 'mp4':
+        writer = imageio.get_writer("out.mp4", format='mp4', mode='I', fps=10)
+        for frame in frames:
+            writer.append_data(np.asarray(frame))
+        writer.close()
 
 
 if __name__ == '__main__':
@@ -156,6 +163,7 @@ if __name__ == '__main__':
     parser.add_argument('img_dir', type=str)
     parser.add_argument('out_file', type=str)
     parser.add_argument('num_frames', type=int)
+    parser.add_argument('--format', type=str, default='gif', choices=['gif', 'mp4', 'png'])
     parser.add_argument('--window_size', type=float, default=0.9)
 
     parser.add_argument('--x_scales', nargs='*', type=float, required=False)
